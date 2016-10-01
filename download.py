@@ -1,29 +1,55 @@
-from __future__ import print_function
-
 import argparse
 import csv
 import errno
+import logging
 import multiprocessing
-import traceback
 import os
 import shutil
-import StringIO
+import time
+import traceback
 
-import requests
+from StringIO import StringIO
 
 from PIL import Image
 
+import requests
+
+
+def config_logger():
+    logger = logging.getLogger('download')
+    logger.setLevel(logging.DEBUG)
+
+    fh = logging.FileHandler('log.txt')
+    fh.setLevel(logging.DEBUG)
+
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.ERROR)
+
+    formatter = logging.Formatter('%(process)d @ %(asctime)s (%(relativeCreated)d) '
+                                  '%(name)s - %(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+    return logger
+
+
+log = config_logger()
+
+
+# progress bar
+# errors
+
 # docs
 # py2 / py3
-# progress bar
-# logging
 # flake8
-# split ?
+# split (? better logging)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Download Google open image dataset.')
 
-    parser.add_argument('--timeout', type=int, default=2,
+    parser.add_argument('--timeout', type=float, default=2.0,
                         help='image download timeout')
     parser.add_argument('--queue-size', type=int, default=1000,
                         help='maximum image url queue size')
@@ -34,8 +60,8 @@ def parse_args():
                              '(-1 for no scale)')
     parser.add_argument('--sub-dirs', type=int, default=1000,
                         help='number of directories to split downloads over')
-    parser.add_argument('--quiet', default=False, action='store_true',
-                        help='disable logging')
+    parser.add_argument('--no-progress', default=False, action='store_true',
+                        help='disable progress bar')
     parser.add_argument('--force', default=False, action='store_true',
                         help='force download and overwrite local files')
 
@@ -50,7 +76,7 @@ def safe_mkdir(path):
         os.makedirs(path)
     except OSError as exception:
         if exception.errno != errno.EEXIST:
-            raise
+            log.exception()
 
 
 def make_out_path(code, sub_dirs, out_dir):
@@ -70,9 +96,11 @@ def make_out_path(code, sub_dirs, out_dir):
 def scale(content, min_dim):
     image = Image.open(content)
 
+    # no scaling, keep images full size
     if min_dim == -1:
         return image
 
+    # aspect-ratio preserving scale so that the smallest dimension is `min_dim`
     width, height = image.size
     scale_dimension = width if width < height else height
     scale_ratio = float(min_dim) / scale_dimension
@@ -86,35 +114,36 @@ def scale(content, min_dim):
     )
 
 
-def write_response(response, out_path, min_dim):
-    content = StringIO.StringIO()
+def read_image(response, min_dim):
+    content = StringIO()
 
     shutil.copyfileobj(response.raw, content)
     content.seek(0)
 
-    image = scale(content, min_dim)
-    image.save(out_path)
+    return scale(content, min_dim)
 
 
 def consumer(args, queue):
+    while queue.empty():
+        time.sleep(0.1)  # give the queue a chance to populate
+
     while not queue.empty():
         code, url = queue.get(block=True, timeout=None)
 
         out_path = make_out_path(code, args.sub_dirs, args.output)
 
         if not args.force and os.path.exists(out_path):
-            print('skip')
+            log.debug('skipping {}, already exists'.format(out_path))
             continue
-
-        if not args.quiet:
-            print(url, out_path)
 
         try:
             response = requests.get(url, stream=True, timeout=args.timeout)
-            write_response(response, out_path, args.min_dim)
-        except Exception as e:
-            print('download error', e)
-            traceback.print_exc()
+            image = read_image(response, args.min_dim)
+            image.save(out_path)
+        except Exception:
+            log.warning('error {}'.format(traceback.format_exc()))
+        else:
+            log.debug('saving {} to {}'.format(url, out_path))
 
 
 def producer(args, queue):
@@ -122,12 +151,14 @@ def producer(args, queue):
 
     for row in csv.DictReader(f):
         queue.put([row['ImageID'], row['OriginalURL']], block=True, timeout=None)
+        log.debug('queue_size = {}'.format(queue.qsize()))
 
     queue.close()
 
 
 if __name__ == '__main__':
     args = parse_args()
+    log.debug(args)
 
     queue = multiprocessing.Queue(args.queue_size)
 
