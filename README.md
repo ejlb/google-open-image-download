@@ -1,6 +1,6 @@
 # Google open image download
 
-A script for downloading and rescaling the [open image
+A py2/py3 script for downloading and rescaling the [open image
 dataset](https://github.com/openimages/dataset) in parallel. 
 
 ## setup

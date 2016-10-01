@@ -8,43 +8,30 @@ import shutil
 import time
 import traceback
 
-from StringIO import StringIO
-
 from PIL import Image
 
 import requests
+import six
 
 
 def config_logger():
     logger = logging.getLogger('download')
     logger.setLevel(logging.DEBUG)
 
-    fh = logging.FileHandler('log.txt')
-    fh.setLevel(logging.DEBUG)
-
     ch = logging.StreamHandler()
-    ch.setLevel(logging.ERROR)
+    ch.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter('%(process)d @ %(asctime)s (%(relativeCreated)d) '
                                   '%(name)s - %(levelname)s - %(message)s')
-    fh.setFormatter(formatter)
     ch.setFormatter(formatter)
 
-    logger.addHandler(fh)
     logger.addHandler(ch)
+
     return logger
 
 
 log = config_logger()
 
-
-# progress bar
-# errors
-
-# docs
-# py2 / py3
-# flake8
-# split (? better logging)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Download Google open image dataset.')
@@ -94,6 +81,8 @@ def make_out_path(code, sub_dirs, out_dir):
 
 
 def scale(content, min_dim):
+    """ Aspect-ratio preserving scale such that the smallest dim is equal to `min_dim` """
+
     image = Image.open(content)
 
     # no scaling, keep images full size
@@ -115,8 +104,9 @@ def scale(content, min_dim):
 
 
 def read_image(response, min_dim):
-    content = StringIO()
+    """ Download response in chunks and convert to a scaled Image object """
 
+    content = six.BytesIO()
     shutil.copyfileobj(response.raw, content)
     content.seek(0)
 
@@ -124,6 +114,8 @@ def read_image(response, min_dim):
 
 
 def consumer(args, queue):
+    """ Whilst the queue has images, download and save them """
+
     while queue.empty():
         time.sleep(0.1)  # give the queue a chance to populate
 
@@ -147,11 +139,12 @@ def consumer(args, queue):
 
 
 def producer(args, queue):
-    f = open(args.input)
+    """ Populate the queue with image_id, url pairs. """
 
-    for row in csv.DictReader(f):
-        queue.put([row['ImageID'], row['OriginalURL']], block=True, timeout=None)
-        log.debug('queue_size = {}'.format(queue.qsize()))
+    with open(args.input) as f:
+        for row in csv.DictReader(f):
+            queue.put([row['ImageID'], row['OriginalURL']], block=True, timeout=None)
+            log.debug('queue_size = {}'.format(queue.qsize()))
 
     queue.close()
 
