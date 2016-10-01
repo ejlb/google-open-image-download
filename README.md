@@ -25,3 +25,8 @@ which is controlled by the `sub-dirs` arg). The name of the saved image correspo
 `ImageID` which can be used to look up labels in the open image dataset. 
 
 Use `--help` to see the other optional args.
+
+## notes
+
+I'm not using asyncio because the processes also scale the image so we wouldn't see much speed up
+
