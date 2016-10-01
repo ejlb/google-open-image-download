@@ -24,13 +24,9 @@ def config_logger():
     formatter = logging.Formatter('%(process)d @ %(asctime)s (%(relativeCreated)d) '
                                   '%(name)s - %(levelname)s - %(message)s')
     ch.setFormatter(formatter)
-
     logger.addHandler(ch)
 
     return logger
-
-
-log = config_logger()
 
 
 def parse_args():
@@ -47,8 +43,6 @@ def parse_args():
                              '(-1 for no scale)')
     parser.add_argument('--sub-dirs', type=int, default=1000,
                         help='number of directories to split downloads over')
-    parser.add_argument('--no-progress', default=False, action='store_true',
-                        help='disable progress bar')
     parser.add_argument('--force', default=False, action='store_true',
                         help='force download and overwrite local files')
 
@@ -147,6 +141,9 @@ def producer(args, queue):
             log.debug('queue_size = {}'.format(queue.qsize()))
 
     queue.close()
+
+
+log = config_logger()
 
 
 if __name__ == '__main__':
