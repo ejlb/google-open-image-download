@@ -1,7 +1,8 @@
 # Google open image download
 
 A py2/py3 script for downloading and rescaling the [open image
-dataset](https://github.com/openimages/dataset) in parallel. Here it is maxing out a 200mbit pipe.
+dataset](https://github.com/openimages/dataset) in parallel. Here it is maxing out a 200mbit pipe
+over 5 days.
 
 ![Maxing out a 200mbit pipe](max-out-200mbit.png)
 
