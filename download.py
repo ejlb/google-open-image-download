@@ -52,6 +52,12 @@ def parse_args():
     return parser.parse_args()
 
 
+def unicode_dict_reader(f, **kwargs):
+    csv_reader = csv.DictReader(f, **kwargs)
+    for row in csv_reader:
+        yield {key: unicode(value, 'utf-8') for key, value in row.iteritems()}
+
+
 def safe_mkdir(path):
     try:
         os.makedirs(path)
@@ -136,7 +142,7 @@ def producer(args, queue):
     """ Populate the queue with image_id, url pairs. """
 
     with open(args.input) as f:
-        for row in csv.DictReader(f):
+        for row in unicode_dict_reader(f):
             queue.put([row['ImageID'], row['OriginalURL']], block=True, timeout=None)
             log.debug('queue_size = {}'.format(queue.qsize()))
 
