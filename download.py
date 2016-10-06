@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import argparse
 import csv
 import errno
@@ -55,7 +57,7 @@ def parse_args():
 def unicode_dict_reader(f, **kwargs):
     csv_reader = csv.DictReader(f, **kwargs)
     for row in csv_reader:
-        yield {key: unicode(value, 'utf-8') for key, value in six.iteritems(row)}
+        yield {key: value for key, value in six.iteritems(row)}
 
 
 def safe_mkdir(path):
